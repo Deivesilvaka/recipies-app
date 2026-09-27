@@ -48,7 +48,7 @@ npm run migration:run
 
 ---
 
-## 4. Rodar a aplicação
+## 4. Rodar a aplicação (API)
 
 ```bash
 npm run start:dev
@@ -59,6 +59,41 @@ A API sobe em `http://localhost:3000`. Documentação Swagger (ambiente não-pro
 ```
 http://localhost:3000/api
 ```
+
+---
+
+## 5. Popular o banco com receitas de exemplo (recomendado)
+
+Sem isso o catálogo fica vazio. Recria o schema do zero e popula com as receitas de exemplo (mantidas em `src/shared/database/seeds/data/recipes.seed-data.json`):
+
+```bash
+npm run db:seed
+```
+
+Cria um usuário dono das receitas, já com e-mail verificado e pronto pra logar (na API ou no site):
+
+```
+email: seed@recipes.app
+senha: Seed@123
+```
+
+---
+
+## 6. Rodar o site (front-end)
+
+A pasta `web/` é um site em HTML/CSS/JS puro (sem build, sem framework, sem instalar nada) que consome todos os endpoints da API: cadastro, verificação de e-mail, login, esqueci minha senha, perfil, busca/detalhe de receitas (públicos, não precisa logar), criação/edição de receita (com reordenação por arrastar-e-soltar de ingredientes/instruções/passos/dicas) e upload da imagem principal. É responsivo (celular e desktop).
+
+Sirva a pasta com **qualquer servidor estático** — não dá pra abrir o `index.html` direto em `file://`, porque o site usa ES modules e o navegador bloqueia isso por segurança:
+
+```bash
+npx serve web
+# ou, se preferir sem instalar nada:
+python3 -m http.server 8080 --directory web
+```
+
+Abra o endereço que o comando mostrar (ex: `http://localhost:8080`) com a API do passo 4 rodando. Por padrão o site chama a API em `http://localhost:3000`; se a sua API estiver em outra porta/host, clique no ícone ⚙ no topo da página para trocar a URL antes de usar.
+
+Para testar rápido: faça login no site com o usuário do seed (`seed@recipes.app` / `Seed@123`) e navegue pelas receitas já populadas.
 
 ---
 
@@ -224,34 +259,6 @@ GET /recipes/{id}/image
 ```
 
 Use esse valor direto no `src` de uma tag `<img>` no front-end.
-
----
-
-## Seed (dados de exemplo)
-
-Popula o banco com receitas de exemplo (mantidas em `src/shared/database/seeds/data/recipes.seed-data.json`), recriando o schema do zero:
-
-```bash
-npm run db:seed
-```
-
-Cria um usuário dono das receitas: `seed@recipes.app` / `Seed@123` (já com e-mail verificado, pronto para login).
-
----
-
-## Site (front-end estático)
-
-A pasta `web/` tem um site simples em HTML/CSS/JS puro (sem build, sem framework) que consome todos os endpoints da API: cadastro, verificação de e-mail, login, esqueci minha senha, perfil, busca/detalhe de receitas, criação/edição de receita (com reordenação por arrastar-e-soltar de ingredientes/instruções/passos/dicas) e upload da imagem principal. É responsivo (funciona em celular e desktop).
-
-Para rodar localmente, sirva a pasta com qualquer servidor estático (não abra o `index.html` direto em `file://`, pois o app usa ES modules):
-
-```bash
-npx serve web
-# ou
-python3 -m http.server 8080 --directory web
-```
-
-Abra o endereço que o servidor indicar (ex: `http://localhost:8080`). Por padrão o site chama a API em `http://localhost:3000` — clique no ícone ⚙ no topo para mudar a URL, se a API estiver rodando em outra porta/host.
 
 ---
 
