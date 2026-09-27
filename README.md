@@ -260,6 +260,29 @@ GET /recipes/{id}/image
 
 Use esse valor direto no `src` de uma tag `<img>` no front-end.
 
+### Excluir receita(s)
+
+Só o autor pode excluir; receitas que não pertencerem a ele são ignoradas (em lote) ou retornam 404 (individual), sem revelar se a receita existe.
+
+Excluir uma receita:
+
+```http
+DELETE /recipes/{id}
+Authorization: Bearer {access_token}
+```
+
+Excluir várias de uma vez:
+
+```http
+DELETE /recipes
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{ "ids": ["3f0b6f0e-8b9b-4c9a-9f9a-8b6c1a2f9e11", "c1a2b3d4-..."] }
+```
+
+No site, a exclusão fica disponível no botão "Excluir esta receita" na página de detalhe, e por seleção múltipla (checkbox nos cards) na listagem de receitas.
+
 ---
 
 ## Documentação da API

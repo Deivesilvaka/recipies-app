@@ -10,6 +10,15 @@ const nav = document.getElementById('nav');
 let currentUser = null;
 let pendingVerificationUserId = sessionStorage.getItem('pendingVerificationUserId') || null;
 let lastSearch = { q: '', category: '', page: 1, limit: 12 };
+let selectedRecipeIds = new Set();
+
+// Bumped on every navigation so an async render (search/getRecipe/profile fetch) that
+// resolves after the user has already navigated elsewhere can detect it's stale and bail
+// out instead of overwriting the page that's on screen now with outdated content.
+let currentNavId = 0;
+function isStaleNav(navId) {
+  return navId !== currentNavId;
+}
 
 // ---------- helpers ----------
 
@@ -77,6 +86,8 @@ function imageSrc(recipe) {
 // ---------- router ----------
 
 async function router() {
+  const navId = ++currentNavId;
+
   renderNav();
   const hash = location.hash.replace(/^#/, '') || '/recipes';
   const parts = hash.split('/').filter(Boolean);
@@ -85,19 +96,20 @@ async function router() {
 
   try {
     if (parts.length === 0 || (parts[0] === 'recipes' && parts.length === 1)) {
-      return renderRecipeList();
+      return await renderRecipeList(navId);
     }
     if (parts[0] === 'login') return renderLogin();
     if (parts[0] === 'signup') return renderSignup();
     if (parts[0] === 'verify') return renderVerify();
     if (parts[0] === 'forgot') return renderForgot();
-    if (parts[0] === 'profile') return renderProfile();
-    if (parts[0] === 'recipes' && parts[1] === 'new') return renderRecipeForm(null);
-    if (parts[0] === 'recipes' && parts[2] === 'edit') return renderRecipeForm(parts[1]);
-    if (parts[0] === 'recipes' && parts.length === 2) return renderRecipeDetail(parts[1]);
+    if (parts[0] === 'profile') return await renderProfile(navId);
+    if (parts[0] === 'recipes' && parts[1] === 'new') return await renderRecipeForm(null, navId);
+    if (parts[0] === 'recipes' && parts[2] === 'edit') return await renderRecipeForm(parts[1], navId);
+    if (parts[0] === 'recipes' && parts.length === 2) return await renderRecipeDetail(parts[1], navId);
 
     app.innerHTML = '<p>Página não encontrada. <a href="#/recipes">Voltar</a></p>';
   } catch (error) {
+    if (isStaleNav(navId)) return;
     app.innerHTML = `<p class="empty-state">${escapeHtml(messageFromError(error))}</p>`;
   }
 }
@@ -106,9 +118,12 @@ window.addEventListener('hashchange', router);
 
 // ---------- recipe list ----------
 
-async function renderRecipeList() {
+async function renderRecipeList(navId = currentNavId) {
   const result = await api.searchRecipes(lastSearch);
+  if (isStaleNav(navId)) return;
   const totalPages = Math.max(1, Math.ceil(result.total / result.limit));
+  selectedRecipeIds.clear();
+  const canDelete = isLoggedIn();
 
   app.innerHTML = `
     <h1>Receitas</h1>
@@ -117,6 +132,12 @@ async function renderRecipeList() {
       <input id="search-category" type="text" placeholder="Categoria exata (opcional)" value="${escapeHtml(lastSearch.category)}" />
       <button type="submit">Buscar</button>
     </form>
+    ${canDelete ? `
+      <div id="bulk-actions" class="bulk-actions">
+        <span id="selected-count" class="muted">Nenhuma selecionada</span>
+        <button type="button" id="delete-selected-btn" class="danger small" disabled>Excluir selecionadas</button>
+      </div>
+    ` : ''}
     <div id="results"></div>
     <div class="pagination">
       <button id="prev-page" class="secondary small" ${result.page <= 1 ? 'disabled' : ''}>← Anterior</button>
@@ -129,7 +150,7 @@ async function renderRecipeList() {
   if (result.items.length === 0) {
     resultsEl.innerHTML = '<p class="empty-state">Nenhuma receita encontrada.</p>';
   } else {
-    resultsEl.innerHTML = `<div class="grid">${result.items.map(recipeCardHtml).join('')}</div>`;
+    resultsEl.innerHTML = `<div class="grid">${result.items.map((r) => recipeCardHtml(r, canDelete)).join('')}</div>`;
   }
 
   document.getElementById('search-form').addEventListener('submit', (event) => {
@@ -149,9 +170,54 @@ async function renderRecipeList() {
     lastSearch.page += 1;
     renderRecipeList();
   });
+
+  if (canDelete) {
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const selectedCountEl = document.getElementById('selected-count');
+
+    function updateBulkActionsUi() {
+      const count = selectedRecipeIds.size;
+      selectedCountEl.textContent = count === 0 ? 'Nenhuma selecionada' : `${count} selecionada(s)`;
+      deleteSelectedBtn.disabled = count === 0;
+    }
+
+    resultsEl.querySelectorAll('.card-select').forEach((checkbox) => {
+      checkbox.addEventListener('click', (event) => {
+        // Só interrompe a propagação para o <a>.card (evitando navegar para o detalhe);
+        // preventDefault aqui bloquearia o próprio toggle do checkbox.
+        event.stopPropagation();
+      });
+      checkbox.addEventListener('change', () => {
+        const id = checkbox.value;
+        if (checkbox.checked) {
+          selectedRecipeIds.add(id);
+        } else {
+          selectedRecipeIds.delete(id);
+        }
+        updateBulkActionsUi();
+      });
+    });
+
+    deleteSelectedBtn.addEventListener('click', async () => {
+      const ids = Array.from(selectedRecipeIds);
+      if (ids.length === 0) return;
+      const confirmed = window.confirm(
+        `Excluir ${ids.length} receita(s) selecionada(s)? Essa ação não pode ser desfeita.`,
+      );
+      if (!confirmed) return;
+
+      try {
+        await api.deleteRecipes(ids);
+        toast('Receita(s) excluída(s)!', 'success');
+        renderRecipeList();
+      } catch (error) {
+        toast(messageFromError(error), 'error');
+      }
+    });
+  }
 }
 
-function recipeCardHtml(recipe) {
+function recipeCardHtml(recipe, canDelete = false) {
   const image = imageSrc(recipe);
   const imageHtml = image
     ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(recipe.title)}" />`
@@ -159,6 +225,11 @@ function recipeCardHtml(recipe) {
 
   return `
     <a class="card" href="#/recipes/${recipe.id}">
+      ${canDelete ? `
+        <label class="card-select-wrap">
+          <input type="checkbox" class="card-select" value="${recipe.id}" title="Selecionar para excluir" />
+        </label>
+      ` : ''}
       ${imageHtml}
       <div class="card-body">
         <div class="card-title">${escapeHtml(recipe.title)}</div>
@@ -172,8 +243,9 @@ function recipeCardHtml(recipe) {
 
 // ---------- recipe detail ----------
 
-async function renderRecipeDetail(id) {
+async function renderRecipeDetail(id, navId = currentNavId) {
   const recipe = await api.getRecipe(id);
+  if (isStaleNav(navId)) return;
   const image = imageSrc(recipe);
 
   app.innerHTML = `
@@ -225,12 +297,29 @@ async function renderRecipeDetail(id) {
     ` : ''}
 
     <hr class="divider" />
-    <button id="edit-btn" class="secondary">Editar esta receita</button>
+    <div class="detail-actions">
+      <button id="edit-btn" class="secondary">Editar esta receita</button>
+      <button id="delete-btn" class="danger">Excluir esta receita</button>
+    </div>
   `;
 
   document.getElementById('edit-btn').addEventListener('click', () => {
     if (!requireAuthOrRedirect()) return;
     navigate(`/recipes/${id}/edit`);
+  });
+
+  document.getElementById('delete-btn').addEventListener('click', async () => {
+    if (!requireAuthOrRedirect()) return;
+    const confirmed = window.confirm('Excluir esta receita? Essa ação não pode ser desfeita.');
+    if (!confirmed) return;
+
+    try {
+      await api.deleteRecipe(id);
+      toast('Receita excluída!', 'success');
+      navigate('/recipes');
+    } catch (error) {
+      toast(messageFromError(error), 'error');
+    }
   });
 }
 
@@ -349,7 +438,7 @@ function createVisualStepEditor(container, steps) {
   };
 }
 
-async function renderRecipeForm(id) {
+async function renderRecipeForm(id, navId = currentNavId) {
   if (!requireAuthOrRedirect()) return;
 
   const isEditing = Boolean(id);
@@ -357,6 +446,7 @@ async function renderRecipeForm(id) {
 
   if (isEditing) {
     recipe = await api.getRecipe(id);
+    if (isStaleNav(navId)) return;
   }
 
   const ingredientItems = recipe
@@ -723,10 +813,11 @@ function renderForgot() {
   });
 }
 
-async function renderProfile() {
+async function renderProfile(navId = currentNavId) {
   if (!requireAuthOrRedirect()) return;
 
   const profile = await ensureCurrentUser();
+  if (isStaleNav(navId)) return;
 
   app.innerHTML = `
     <h1>Meu perfil</h1>

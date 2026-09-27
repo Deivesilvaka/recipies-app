@@ -255,6 +255,7 @@ form.wide {
 }
 
 .card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -263,6 +264,37 @@ form.wide {
   color: var(--text);
   display: flex;
   flex-direction: column;
+}
+
+.card-select-wrap {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  margin: 0;
+}
+
+.card-select-wrap input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .card img,

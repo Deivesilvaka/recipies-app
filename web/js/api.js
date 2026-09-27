@@ -137,4 +137,7 @@ export const api = {
     });
   },
   recipeImageUrl: (id) => `${getBaseUrl()}/recipes/${id}/image`,
+  deleteRecipe: (id) => request(`/recipes/${id}`, { method: 'DELETE', auth: true }),
+  deleteRecipes: (ids) =>
+    request('/recipes', { method: 'DELETE', body: { ids }, auth: true }),
 };

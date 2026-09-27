@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpStatus,
   Param,
@@ -30,6 +31,7 @@ import { CurrentUser } from '@src/auth/decorators/current-user.decorator';
 import { RecipesService } from '@src/recipes/services/recipes.service';
 import { UpsertRecipeDto } from '@src/recipes/dtos/upsert-recipe.dto';
 import { SearchRecipesDto } from '@src/recipes/dtos/search-recipes.dto';
+import { DeleteRecipesDto } from '@src/recipes/dtos/delete-recipes.dto';
 import { Public } from '@src/auth/decorators/public.decorator';
 import { RECIPE_IMAGE_MAX_SIZE_BYTES } from '@src/recipes/constants/recipe-image.constants';
 
@@ -72,6 +74,36 @@ export class RecipesController {
   @ApiNotFoundResponse({ description: STATUS_CODES[HttpStatus.NOT_FOUND] })
   async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.recipesService.findOne(id);
+  }
+
+  @Delete()
+  @ApiOperation({
+    summary: 'Exclui uma ou mais receitas',
+    description:
+      'Exclui, em lote, as receitas informadas em "ids" que pertencerem ao usuário logado (as demais são ignoradas silenciosamente). Só o autor da receita pode excluí-la.',
+  })
+  @ApiBody({ type: DeleteRecipesDto })
+  @ApiOkResponse({ description: STATUS_CODES[HttpStatus.OK] })
+  @ApiNotFoundResponse({ description: STATUS_CODES[HttpStatus.NOT_FOUND] })
+  async removeMany(
+    @CurrentUser() user: { userId: string },
+    @Body() deleteRecipesDto: DeleteRecipesDto,
+  ) {
+    return this.recipesService.remove(user.userId, deleteRecipesDto.ids);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Exclui uma receita',
+    description: 'Só o autor da receita pode excluí-la.',
+  })
+  @ApiOkResponse({ description: STATUS_CODES[HttpStatus.OK] })
+  @ApiNotFoundResponse({ description: STATUS_CODES[HttpStatus.NOT_FOUND] })
+  async removeOne(
+    @CurrentUser() user: { userId: string },
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.recipesService.remove(user.userId, [id]);
   }
 
   @Post(':id/image')

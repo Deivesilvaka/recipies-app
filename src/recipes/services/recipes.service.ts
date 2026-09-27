@@ -259,6 +259,30 @@ export class RecipesService {
     };
   }
 
+  async remove(ownerId: string, ids: string[]): Promise<{ deletedIds: string[] }> {
+    const recipes = await this.recipeRepository.find({
+      where: { id: In(ids), ownerId },
+    });
+
+    // 404 quando nenhuma das receitas pedidas pertence ao usuário, pelo mesmo motivo do
+    // upsert: não confirmar a existência/dono da receita a quem não tem acesso a ela.
+    if (!recipes.length) {
+      throw new NotFoundException('Receita não encontrada');
+    }
+
+    const deletedIds = recipes.map((recipe) => recipe.id);
+
+    for (const recipe of recipes) {
+      await this.removeStoredImage(recipe);
+    }
+
+    // recipeRepository.remove() zera o id das entidades removidas (TypeORM as marca como
+    // "não persistidas"), por isso os ids são capturados antes de chamar remove().
+    await this.recipeRepository.remove(recipes);
+
+    return { deletedIds };
+  }
+
   private async removeStoredImage(recipe: RecipeEntity): Promise<void> {
     if (!recipe.mainImagePath) {
       return;
