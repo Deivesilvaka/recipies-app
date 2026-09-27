@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Receitas</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#/recipes">🍲 Receitas</a>
+      <nav id="nav" class="nav"></nav>
+      <button id="settings-toggle" class="icon-button" title="Configurar URL da API">
+        ⚙
+      </button>
+    </header>
+
+    <div id="settings-panel" class="settings-panel settings-panel--hidden">
+      <form id="base-url-form" class="inline-form">
+        <label for="base-url-input">URL da API</label>
+        <input id="base-url-input" type="url" placeholder="http://localhost:3000" required />
+        <button type="submit">Salvar</button>
+      </form>
+    </div>
+
+    <main id="app" class="container"></main>
+
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

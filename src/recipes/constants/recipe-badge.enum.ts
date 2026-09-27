@@ -1,0 +1,7 @@
+export enum RecipeBadge {
+  PROTEICO = 'PROTEICO',
+  CONGELAVEL = 'CONGELÁVEL',
+  AIR_FRYER = 'AIR FRYER',
+  VEGETARIANO = 'VEGETARIANO',
+  SEM_GLUTEN = 'SEM GLÚTEN',
+}
